@@ -388,7 +388,7 @@ const Site = () => {
   return (
     <div className="container mx-auto w-full">
       {/* 工具栏 */}
-      <div className="flex items-center justify-center gap-4 pt-2 pb-4">
+      <div className="bg-background/60 sticky top-0 z-50 flex w-full items-center justify-center gap-4 pt-2 pb-4 backdrop-blur">
         {/* 撤销/重做 */}
         <Button size="icon" variant="ghost" title={`撤销(${isApple ? "⌘" : "Ctrl"}+Z)`} onClick={handleUndo}>
           <CornerUpLeft />
