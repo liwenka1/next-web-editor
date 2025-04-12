@@ -39,6 +39,11 @@ interface ToolItem {
   action: React.ReactNode | (() => void);
 }
 
+interface SearchResult {
+  index: number;
+  count: number;
+}
+
 interface FormDialogProps {
   title: string;
   fields: Array<{
@@ -154,6 +159,10 @@ const Site = () => {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [tableSelection, setTableSelection] = useState({ rows: 0, cols: 0 });
   const [isTablePanelOpen, setIsTablePanelOpen] = useState(false);
+  const [isSearchPanelOpen, setIsSearchPanelOpen] = useState(false);
+  const [searchKeyword, setSearchKeyword] = useState("");
+  const [replaceKeyword, setReplaceKeyword] = useState("");
+  const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
 
   const isApple = typeof navigator !== "undefined" && /Mac OS X/.test(navigator.userAgent);
 
@@ -343,6 +352,34 @@ const Site = () => {
     ]);
   }, []);
 
+  // 添加搜索相关处理函数
+  const handleSearch = useCallback((keyword: string) => {
+    editorRef.current?.command.executeSearch(keyword || null);
+    const result = editorRef.current?.command.getSearchNavigateInfo();
+    setSearchResult(result ? { index: result.index, count: result.count } : null);
+  }, []);
+
+  const handleReplace = useCallback(() => {
+    if (searchKeyword && replaceKeyword && searchKeyword !== replaceKeyword) {
+      editorRef.current?.command.executeReplace(replaceKeyword);
+    }
+  }, [searchKeyword, replaceKeyword]);
+
+  const handleSearchNavigate = useCallback((direction: "prev" | "next") => {
+    if (direction === "prev") {
+      editorRef.current?.command.executeSearchNavigatePre();
+    } else {
+      editorRef.current?.command.executeSearchNavigateNext();
+    }
+    const result = editorRef.current?.command.getSearchNavigateInfo();
+    setSearchResult(result ? { index: result.index, count: result.count } : null);
+  }, []);
+
+  // 添加打印处理函数
+  const handlePrint = useCallback(() => {
+    editorRef.current?.command.executePrint();
+  }, []);
+
   // 添加工具栏项目
   const additionalTools: ToolItem[] = [
     {
@@ -382,6 +419,16 @@ const Site = () => {
       icon: <Calendar />,
       label: "日期",
       action: <DateFormatMenu onSelectFormat={handleDateFormatSelect} />
+    },
+    {
+      icon: <span>🔍</span>, // 替换为合适的图标
+      label: "搜索替换",
+      action: () => setIsSearchPanelOpen(true)
+    },
+    {
+      icon: <span>🖨️</span>, // 替换为合适的图标
+      label: "打印",
+      action: handlePrint
     }
   ];
 
@@ -480,6 +527,42 @@ const Site = () => {
             {isTablePanelOpen && tool.label === "表格" && renderTablePanel()}
           </div>
         ))}
+
+        {isSearchPanelOpen && (
+          <div className="absolute rounded-md bg-white p-4 shadow-lg" style={{ top: "100%", right: 0 }}>
+            <div className="mb-4 flex items-center gap-2">
+              <Input
+                placeholder="搜索"
+                value={searchKeyword}
+                onChange={(e) => {
+                  setSearchKeyword(e.target.value);
+                  handleSearch(e.target.value);
+                }}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch(searchKeyword)}
+              />
+              <Button variant="ghost" onClick={() => setIsSearchPanelOpen(false)}>
+                ×
+              </Button>
+            </div>
+
+            <div className="mb-4 flex items-center gap-2">
+              <Input placeholder="替换" value={replaceKeyword} onChange={(e) => setReplaceKeyword(e.target.value)} />
+              <Button onClick={handleReplace}>替换</Button>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" onClick={() => handleSearchNavigate("prev")} disabled={!searchResult}>
+                  ↑
+                </Button>
+                <span>{searchResult ? `${searchResult.index}/${searchResult.count}` : "0/0"}</span>
+                <Button variant="ghost" onClick={() => handleSearchNavigate("next")} disabled={!searchResult}>
+                  ↓
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <input type="file" ref={imageInputRef} accept="image/*" className="hidden" onChange={handleImageUpload} />
       </div>
