@@ -480,7 +480,7 @@ export const commentList: IComment[] = [
 export const options: IEditorOption = {
   margins: [100, 120, 100, 120],
   watermark: {
-    data: "CANVAS-EDITOR",
+    data: "李文凯-@liwenka1",
     size: 120
   },
   pageNumber: {

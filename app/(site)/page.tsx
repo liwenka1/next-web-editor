@@ -2,7 +2,10 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import Editor, { ElementType, RowFlex } from "@hufe921/canvas-editor";
+import { CornerUpLeft, CornerUpRight, Paintbrush, Eraser } from "lucide-react";
+
 import { data, options } from "@/mock";
+import { Button } from "@/components/ui/button";
 
 const Site = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -100,25 +103,33 @@ const Site = () => {
   }, []);
 
   return (
-    <div className="editor-container">
+    <div className="container mx-auto w-full p-8">
       {/* 工具栏 */}
-      <div className="toolbar">
-        <div className="menu-item__undo" title={`撤销(${isApple ? "⌘" : "Ctrl"}+Z)`} onClick={handleUndo}>
-          撤销
+      <div className="flex items-center justify-center gap-4">
+        <div title={`撤销(${isApple ? "⌘" : "Ctrl"}+Z)`} onClick={handleUndo}>
+          <Button size="icon" variant="ghost">
+            <CornerUpLeft />
+          </Button>
         </div>
-        <div className="menu-item__redo" title={`重做(${isApple ? "⌘" : "Ctrl"}+Y)`} onClick={handleRedo}>
-          重做
+        <div title={`重做(${isApple ? "⌘" : "Ctrl"}+Y)`} onClick={handleRedo}>
+          <Button size="icon" variant="ghost">
+            <CornerUpRight />
+          </Button>
         </div>
-        <div className="menu-item__painter" onClick={handlePainterClick} onDoubleClick={handlePainterDblClick}>
-          格式刷
+        <div onClick={handlePainterClick} onDoubleClick={handlePainterDblClick}>
+          <Button size="icon" variant="ghost">
+            <Paintbrush />
+          </Button>
         </div>
-        <div className="menu-item__format" onClick={handleFormat}>
-          清除格式
+        <div onClick={handleFormat}>
+          <Button size="icon" variant="ghost">
+            <Eraser />
+          </Button>
         </div>
       </div>
 
       {/* 编辑器容器 */}
-      <div ref={containerRef} className="canvas-editor" />
+      <div ref={containerRef} className="canvas-editor flex items-center justify-center border shadow-2xs" />
     </div>
   );
 };
