@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useCallback, useState } from "react";
-import Editor, { ElementType, RowFlex } from "@hufe921/canvas-editor";
+import Editor, {
+  EditorMode,
+  ElementType,
+  type ICatalogItem,
+  PageMode,
+  PaperDirection,
+  RowFlex
+} from "@hufe921/canvas-editor";
 import {
   CornerUpLeft,
   CornerUpRight,
@@ -12,7 +19,13 @@ import {
   Code,
   Link,
   Image as ImageIcon,
-  Table
+  Table,
+  Search,
+  Printer,
+  Settings,
+  ChevronDown,
+  Fullscreen,
+  X
 } from "lucide-react";
 
 import { data, options } from "@/mock";
@@ -25,6 +38,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useDebounceFn } from "ahooks";
 
 type EditorCommand = Editor["command"];
 interface MenuItem {
@@ -166,6 +180,18 @@ const Site = () => {
 
   const isApple = typeof navigator !== "undefined" && /Mac OS X/.test(navigator.userAgent);
 
+  const handleContentChange = async () => {
+    // 这里可以添加字数统计、目录更新等逻辑
+    const wordCount = await editorRef.current?.command.getWordCount();
+    console.log("Word count:", wordCount);
+
+    if (catalogVisible) {
+      updateCatalog();
+    }
+  };
+  const { run } = useDebounceFn(handleContentChange, {
+    wait: 200
+  });
   // 初始化编辑器
   useEffect(() => {
     if (containerRef.current) {
@@ -199,6 +225,9 @@ const Site = () => {
         },
         options
       );
+
+      editorRef.current.listener.contentChange = run;
+      editorRef.current.listener.pageModeChange = handlePageModeChange;
     }
 
     return () => {
@@ -207,7 +236,7 @@ const Site = () => {
         editorRef.current = null;
       }
     };
-  }, []);
+  }, [run]);
 
   // 操作处理函数
   const handleUndo = useCallback(() => {
@@ -380,6 +409,84 @@ const Site = () => {
     editorRef.current?.command.executePrint();
   }, []);
 
+  const [editorOptions, setEditorOptions] = useState({});
+  const [catalogVisible, setCatalogVisible] = useState(true);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [pageMode, setPageMode] = useState<PageMode>(PageMode.CONTINUITY);
+  const [paperDirection, setPaperDirection] = useState<PaperDirection>(PaperDirection.VERTICAL);
+
+  // 目录操作
+  const handleCatalogToggle = () => {
+    setCatalogVisible(!catalogVisible);
+    if (!catalogVisible) {
+      updateCatalog();
+    }
+  };
+
+  const [catalogData, setCatalogData] = useState<ICatalogItem[]>([]);
+
+  const updateCatalog = async () => {
+    const catalog = await editorRef.current?.command.getCatalog();
+    if (catalog) {
+      setCatalogData(catalog);
+    }
+  };
+
+  // 编辑器配置对话框
+  const handleEditorConfig = () => {
+    const options = editorRef.current?.command.getOptions();
+    setEditorOptions(options || {});
+  };
+
+  // 页面模式切换
+  const handlePageModeChange = (mode: PageMode) => {
+    setPageMode(mode);
+    editorRef.current?.command.executePageMode(mode);
+  };
+
+  // 全屏切换
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
+    setFullscreen(!fullscreen);
+  };
+
+  // 纸张方向设置
+  const handlePaperDirection = (direction: PaperDirection) => {
+    setPaperDirection(direction);
+    editorRef.current?.command.executePaperDirection(direction);
+  };
+
+  // 编辑器模式切换
+  const [currentModeIndex, setCurrentModeIndex] = useState(0);
+  const MODE_LIST = [
+    { mode: EditorMode.EDIT, name: "编辑模式" },
+    { mode: EditorMode.CLEAN, name: "清洁模式" },
+    { mode: EditorMode.READONLY, name: "只读模式" },
+    { mode: EditorMode.FORM, name: "表单模式" },
+    { mode: EditorMode.PRINT, name: "打印模式" },
+    { mode: EditorMode.DESIGN, name: "设计模式" }
+  ];
+
+  const cycleEditorMode = () => {
+    setCurrentModeIndex((prev) => (prev + 1) % MODE_LIST.length);
+    const newMode = MODE_LIST[currentModeIndex].mode;
+    editorRef.current?.command.executeMode(newMode);
+    // 更新菜单栏权限视觉反馈
+    const isReadonly = newMode === EditorMode.READONLY;
+    const enableMenuList = ["search", "print"];
+    // 这里需要根据实际DOM选择器调整
+    document.querySelectorAll<HTMLDivElement>(".menu-item>div").forEach((dom) => {
+      const menu = dom.dataset.menu;
+      isReadonly && (!menu || !enableMenuList.includes(menu))
+        ? dom.classList.add("disable")
+        : dom.classList.remove("disable");
+    });
+  };
+
   // 添加工具栏项目
   const additionalTools: ToolItem[] = [
     {
@@ -421,12 +528,12 @@ const Site = () => {
       action: <DateFormatMenu onSelectFormat={handleDateFormatSelect} />
     },
     {
-      icon: <span>🔍</span>, // 替换为合适的图标
+      icon: <Search />, // 替换为合适的图标
       label: "搜索替换",
       action: () => setIsSearchPanelOpen(true)
     },
     {
-      icon: <span>🖨️</span>, // 替换为合适的图标
+      icon: <Printer />, // 替换为合适的图标
       label: "打印",
       action: handlePrint
     }
@@ -569,6 +676,94 @@ const Site = () => {
 
       {/* 编辑器容器 */}
       <div ref={containerRef} className="canvas-editor flex items-center justify-center border shadow-2xs" />
+
+      <div>
+        {/* 目录开关 */}
+        <Button onClick={handleCatalogToggle}>{catalogVisible ? "隐藏目录" : "显示目录"}</Button>
+
+        {catalogVisible && (
+          <div className="catalog-panel">
+            <div className="catalog-header">
+              <span>目录</span>
+              <X size={16} onClick={handleCatalogToggle} />
+            </div>
+            <div className="catalog-content">
+              {catalogData.map((item) => (
+                <div key={item.id} onClick={() => editorRef.current?.command.executeLocationCatalog(item.id)}>
+                  {item.name}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 编辑器配置 */}
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button onClick={handleEditorConfig}>
+              <Settings size={16} />
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>编辑器配置</DialogTitle>
+            </DialogHeader>
+            <Input
+              value={JSON.stringify(editorOptions, null, 2)}
+              onChange={(e) => setEditorOptions(JSON.parse(e.target.value))}
+            />
+            <Button onClick={() => editorRef.current?.command.executeUpdateOptions(editorOptions)}>应用配置</Button>
+          </DialogContent>
+        </Dialog>
+
+        {/* 页面模式选择 */}
+        <div className="dropdown">
+          <Button>
+            {pageMode} <ChevronDown size={14} />
+          </Button>
+          <div className="dropdown-menu">
+            {Object.values(PageMode).map((mode) => (
+              <div key={mode} onClick={() => handlePageModeChange(mode)}>
+                {mode}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 全屏按钮 */}
+        <Button onClick={toggleFullscreen}>
+          <Fullscreen size={16} />
+          {fullscreen ? "退出全屏" : "全屏"}
+        </Button>
+
+        {/* 编辑器模式切换 */}
+        <Button onClick={cycleEditorMode}>{MODE_LIST[currentModeIndex].name}</Button>
+
+        {/* 纸张方向 */}
+        <div className="dropdown">
+          <Button>
+            {paperDirection} <ChevronDown size={14} />
+          </Button>
+          <div className="dropdown-menu">
+            {Object.values(PaperDirection).map((direction) => (
+              <div key={direction} onClick={() => handlePaperDirection(direction)}>
+                {direction}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* 目录面板 */}
+      {catalogVisible && (
+        <div className="catalog-panel">
+          <div className="catalog-header">
+            <span>目录</span>
+            <X size={16} onClick={handleCatalogToggle} />
+          </div>
+          <div className="catalog-content">{/* 动态渲染目录内容 */}</div>
+        </div>
+      )}
     </div>
   );
 };
