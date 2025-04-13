@@ -10,15 +10,18 @@ import {
   Calendar,
   CheckSquare,
   Code,
-  Link,
+  Link as LinkIcon,
   Image as ImageIcon,
   Table,
   Search,
   Printer,
   Settings,
   Fullscreen,
-  X
+  X,
+  Twitter,
+  Github
 } from "lucide-react";
+import Link from "next/link";
 
 import { data, options } from "@/mock";
 import { Button } from "@/components/ui/button";
@@ -45,6 +48,8 @@ import { useEditorFormat } from "@/hooks/use-editor-format";
 import { useEditorInsert } from "@/hooks/use-editor-insert";
 import { useEditorSearch } from "@/hooks/use-editor-search";
 import { useEditorCatalog } from "@/hooks/use-editor-catalog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Label } from "@/components/ui/label";
 
 const Site = () => {
   // 使用自定义 hooks
@@ -217,7 +222,7 @@ const Site = () => {
       action: () => imageInputRef.current?.click()
     },
     {
-      icon: <Link />,
+      icon: <LinkIcon />,
       label: "超链接",
       action: <HyperlinkDialog onConfirm={handleHyperlinkInsert} />
     },
@@ -411,67 +416,105 @@ const Site = () => {
         <div ref={containerRef} className="canvas-editor flex flex-1 items-center justify-center border shadow-2xs" />
       </div>
 
-      {/* 设置栏 */}
-      <div className="bg-background/60 sticky bottom-0 z-50 flex w-full items-center justify-center gap-4 pt-2 pb-4 backdrop-blur">
-        {/* 目录开关 */}
-        <Button variant="ghost" onClick={handleCatalogToggle}>
-          {catalogVisible ? "隐藏目录" : "显示目录"}
-        </Button>
+      <div className="bg-background/60 sticky bottom-0 z-50 flex w-full items-center justify-between gap-4 pt-2 pb-4 backdrop-blur">
+        {/* 设置栏 */}
+        <div className="flex space-x-4">
+          {/* 目录开关 */}
+          <Button variant="ghost" onClick={handleCatalogToggle}>
+            {catalogVisible ? "隐藏目录" : "显示目录"}
+          </Button>
 
-        {/* 编辑器配置 */}
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button variant="ghost" onClick={handleEditorConfig}>
-              <Settings size={16} />
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>编辑器配置</DialogTitle>
-            </DialogHeader>
-            <Textarea
-              className="max-h-96 overflow-auto"
-              value={JSON.stringify(editorOptions, null, 2)}
-              onChange={(e) => setEditorOptions(JSON.parse(e.target.value))}
-            />
-            <Button onClick={() => editorRef.current?.command.executeUpdateOptions(editorOptions)}>应用配置</Button>
-          </DialogContent>
-        </Dialog>
+          {/* 编辑器模式切换 */}
+          <Button variant="ghost" onClick={cycleEditorMode}>
+            {MODE_LIST[currentModeIndex].name}
+          </Button>
 
-        {/* 页面模式选择 */}
-        <Select value={pageMode} onValueChange={(value) => handlePageModeChange(value as PageMode)}>
-          <SelectTrigger className="w-[180px]">{pageMode}</SelectTrigger>
-          <SelectContent>
-            {Object.values(PageMode).map((mode) => (
-              <SelectItem key={mode} value={mode}>
-                {mode}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          {/* 页面模式选择 */}
+          <Label htmlFor="pageMode">页面模式</Label>
+          <Select value={pageMode} onValueChange={(value) => handlePageModeChange(value as PageMode)}>
+            <SelectTrigger className="w-[180px]">{pageMode}</SelectTrigger>
+            <SelectContent>
+              {Object.values(PageMode).map((mode) => (
+                <SelectItem key={mode} value={mode}>
+                  {mode}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-        {/* 全屏按钮 */}
-        <Button variant="ghost" onClick={toggleFullscreen}>
-          <Fullscreen size={16} />
-          {fullscreen ? "退出全屏" : "全屏"}
-        </Button>
+          {/* 纸张方向 */}
+          <Label htmlFor="paperDirection">纸张方向</Label>
+          <Select value={paperDirection} onValueChange={(value) => handlePaperDirection(value as PaperDirection)}>
+            <SelectTrigger className="w-[180px]">{paperDirection}</SelectTrigger>
+            <SelectContent>
+              {Object.values(PaperDirection).map((mode) => (
+                <SelectItem key={mode} value={mode}>
+                  {mode}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-        {/* 编辑器模式切换 */}
-        <Button variant="ghost" onClick={cycleEditorMode}>
-          {MODE_LIST[currentModeIndex].name}
-        </Button>
+          {/* 编辑器配置 */}
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="ghost" onClick={handleEditorConfig}>
+                <Settings size={16} />
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>编辑器配置</DialogTitle>
+              </DialogHeader>
+              <Textarea
+                className="max-h-96 overflow-auto"
+                value={JSON.stringify(editorOptions, null, 2)}
+                onChange={(e) => setEditorOptions(JSON.parse(e.target.value))}
+              />
+              <Button onClick={() => editorRef.current?.command.executeUpdateOptions(editorOptions)}>应用配置</Button>
+            </DialogContent>
+          </Dialog>
 
-        {/* 纸张方向 */}
-        <Select value={paperDirection} onValueChange={(value) => handlePaperDirection(value as PaperDirection)}>
-          <SelectTrigger className="w-[180px]">{paperDirection}</SelectTrigger>
-          <SelectContent>
-            {Object.values(PaperDirection).map((mode) => (
-              <SelectItem key={mode} value={mode}>
-                {mode}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          {/* 全屏按钮 */}
+          <Button variant="ghost" onClick={toggleFullscreen}>
+            <Fullscreen size={16} />
+            {fullscreen ? "退出全屏" : "全屏"}
+          </Button>
+        </div>
+
+        {/* 个人信息 */}
+        <div className="flex space-x-4">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Link href="https://x.com/liwenka1" target="_blank">
+                  <Button variant="outline" size="icon" className="cursor-pointer rounded-full">
+                    <Twitter className="h-4 w-4" />
+                    <span className="sr-only">Twitter</span>
+                  </Button>
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Follow me on Twitter</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Link href="https://github.com/liwenka1" target="_blank">
+                  <Button variant="outline" size="icon" className="cursor-pointer rounded-full">
+                    <Github className="h-4 w-4" />
+                    <span className="sr-only">Github</span>
+                  </Button>
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Connect with me on Github</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
       </div>
     </div>
   );
