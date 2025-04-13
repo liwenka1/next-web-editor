@@ -1,14 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useCallback, useState } from "react";
-import Editor, {
-  EditorMode,
-  ElementType,
-  type ICatalogItem,
-  PageMode,
-  PaperDirection,
-  RowFlex
-} from "@hufe921/canvas-editor";
+import { useEffect } from "react";
+import Editor, { ElementType, PageMode, PaperDirection, RowFlex } from "@hufe921/canvas-editor";
 import {
   CornerUpLeft,
   CornerUpRight,
@@ -37,146 +30,72 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useDebounceFn } from "ahooks";
+import HyperlinkDialog from "./components/hyperlink-dialog";
+import CodeBlockDialog from "./components/code-block-dialog";
+import DateFormatMenu from "./components/date-format-menu";
 
-type EditorCommand = Editor["command"];
-interface MenuItem {
-  label: string;
-  value: string | number;
-  title?: string;
-}
+import type { EditorCommand, MenuItem, ToolItem } from "@/type.ts";
 
-interface ToolItem {
-  icon: React.ReactNode;
-  label: string;
-  action: React.ReactNode | (() => void);
-}
-
-interface SearchResult {
-  index: number;
-  count: number;
-}
-
-interface FormDialogProps {
-  title: string;
-  fields: Array<{
-    type: "text" | "number" | "textarea" | "select";
-    label: string;
-    name: string;
-    options?: Array<{ label: string; value: string }>;
-    required?: boolean;
-  }>;
-  onConfirm: (data: Record<string, string>) => void;
-}
-
-const FormDialog = ({ title, fields, onConfirm }: FormDialogProps) => {
-  const [formData, setFormData] = useState<Record<string, string>>({});
-  const [isOpen, setIsOpen] = useState(false);
-
-  return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button variant="ghost">{title}</Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-4 py-4">
-          {fields.map((field) => (
-            <div key={field.name} className="grid grid-cols-4 items-center gap-4">
-              <label className="text-right">{field.label}</label>
-              {field.type === "select" ? (
-                <select
-                  className="col-span-3"
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      [field.name]: e.target.value
-                    }))
-                  }
-                >
-                  {field.options?.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <Input
-                  type={field.type}
-                  className="col-span-3"
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      [field.name]: e.target.value
-                    }))
-                  }
-                />
-              )}
-            </div>
-          ))}
-        </div>
-        <DialogFooter>
-          <Button
-            onClick={() => {
-              onConfirm(formData);
-              setIsOpen(false);
-            }}
-          >
-            确认
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-};
-
-// 将这些组件移到 Site 组件外部
-const HyperlinkDialog = ({ onConfirm }: { onConfirm: (data: Record<string, string>) => void }) => (
-  <FormDialog
-    title="插入超链接"
-    fields={[
-      { type: "text", label: "文本", name: "text", required: true },
-      { type: "text", label: "链接", name: "url", required: true }
-    ]}
-    onConfirm={onConfirm}
-  />
-);
-
-const CodeBlockDialog = ({ onConfirm }: { onConfirm: (data: Record<string, string>) => void }) => (
-  <FormDialog title="插入代码块" fields={[{ type: "textarea", label: "代码", name: "code" }]} onConfirm={onConfirm} />
-);
-
-const DateFormatMenu = ({ onSelectFormat }: { onSelectFormat: (format: string) => void }) => (
-  <DropdownMenu>
-    <DropdownMenuTrigger asChild>
-      <Button variant="ghost">日期格式</Button>
-    </DropdownMenuTrigger>
-    <DropdownMenuContent>
-      {["yyyy-MM-dd", "yyyy-MM-dd hh:mm:ss"].map((format) => (
-        <DropdownMenuItem key={format} onSelect={() => onSelectFormat(format)}>
-          {format}
-        </DropdownMenuItem>
-      ))}
-    </DropdownMenuContent>
-  </DropdownMenu>
-);
+// 导入自定义 hooks
+import { useEditorBasic } from "@/hooks/use-editor-basic";
+import { useEditorFormat } from "@/hooks/use-editor-format";
+import { useEditorInsert } from "@/hooks/use-editor-insert";
+import { useEditorSearch } from "@/hooks/use-editor-search";
+import { useEditorCatalog } from "@/hooks/use-editor-catalog";
 
 const Site = () => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const editorRef = useRef<Editor | null>(null);
-  const painterTimeoutRef = useRef<number | null>(null);
-  const colorControlRef = useRef<HTMLInputElement>(null);
-  const isFirstClickRef = useRef(true);
-  const imageInputRef = useRef<HTMLInputElement>(null);
-  const [tableSelection, setTableSelection] = useState({ rows: 0, cols: 0 });
-  const [isTablePanelOpen, setIsTablePanelOpen] = useState(false);
-  const [isSearchPanelOpen, setIsSearchPanelOpen] = useState(false);
-  const [searchKeyword, setSearchKeyword] = useState("");
-  const [replaceKeyword, setReplaceKeyword] = useState("");
-  const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
+  // 使用自定义 hooks
+  const {
+    editorRef,
+    containerRef,
+    pageMode,
+    paperDirection,
+    currentModeIndex,
+    editorOptions,
+    fullscreen,
+    MODE_LIST,
+    executeCommand,
+    handlePageModeChange,
+    handlePaperDirection,
+    toggleFullscreen,
+    handleEditorConfig,
+    cycleEditorMode,
+    setEditorOptions
+  } = useEditorBasic();
+
+  const { colorControlRef, handleUndo, handleRedo, handlePainterClick, handlePainterDblClick, handleFormat } =
+    useEditorFormat(editorRef);
+
+  const {
+    imageInputRef,
+    tableSelection,
+    isTablePanelOpen,
+    handleImageUpload,
+    handleHyperlinkInsert,
+    handleCodeBlockInsert,
+    handleDateFormatSelect,
+    handleInsertCheckbox,
+    handlePrint,
+    setTableSelection,
+    setIsTablePanelOpen
+  } = useEditorInsert(editorRef);
+
+  const {
+    isSearchPanelOpen,
+    searchKeyword,
+    replaceKeyword,
+    searchResult,
+    setIsSearchPanelOpen,
+    setSearchKeyword,
+    setReplaceKeyword,
+    handleSearch,
+    handleReplace,
+    handleSearchNavigate
+  } = useEditorSearch(editorRef);
+
+  const { catalogVisible, catalogData, updateCatalog, handleCatalogToggle } = useEditorCatalog(editorRef);
 
   const isApple = typeof navigator !== "undefined" && /Mac OS X/.test(navigator.userAgent);
 
@@ -189,9 +108,11 @@ const Site = () => {
       updateCatalog();
     }
   };
+
   const { run } = useDebounceFn(handleContentChange, {
     wait: 200
   });
+
   // 初始化编辑器
   useEffect(() => {
     if (containerRef.current) {
@@ -236,59 +157,7 @@ const Site = () => {
         editorRef.current = null;
       }
     };
-  }, [run]);
-
-  // 操作处理函数
-  const handleUndo = useCallback(() => {
-    console.log("undo");
-    editorRef.current?.command.executeUndo();
-  }, []);
-
-  const handleRedo = useCallback(() => {
-    console.log("redo");
-    editorRef.current?.command.executeRedo();
-  }, []);
-
-  const handlePainterClick = useCallback(() => {
-    if (isFirstClickRef.current) {
-      isFirstClickRef.current = false;
-      painterTimeoutRef.current = window.setTimeout(() => {
-        console.log("painter-click");
-        isFirstClickRef.current = true;
-        editorRef.current?.command.executePainter({
-          isDblclick: false
-        });
-      }, 200);
-    } else {
-      if (painterTimeoutRef.current) {
-        window.clearTimeout(painterTimeoutRef.current);
-      }
-    }
-  }, []);
-
-  const handlePainterDblClick = useCallback(() => {
-    console.log("painter-dblclick");
-    isFirstClickRef.current = true;
-    if (painterTimeoutRef.current) {
-      window.clearTimeout(painterTimeoutRef.current);
-    }
-    editorRef.current?.command.executePainter({
-      isDblclick: true
-    });
-  }, []);
-
-  const handleFormat = useCallback(() => {
-    console.log("format");
-    editorRef.current?.command.executeFormat();
-  }, []);
-
-  // 通用命令执行器
-  const executeCommand = <T extends keyof EditorCommand>(command: T, ...args: Parameters<EditorCommand[T]>) => {
-    return () => {
-      // @ts-expect-error 类型推断需要
-      editorRef.current?.command[command](...args);
-    };
-  };
+  }, [run, containerRef, handlePageModeChange, editorRef]);
 
   // 渲染下拉菜单项
   const renderMenuItems = (items: MenuItem[], command: keyof EditorCommand) => (
@@ -334,159 +203,6 @@ const Site = () => {
     </div>
   );
 
-  // 图片上传处理
-  const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.src = reader.result as string;
-      img.onload = () => {
-        editorRef.current?.command.executeImage({
-          value: reader.result as string,
-          width: img.width,
-          height: img.height
-        });
-      };
-    };
-    reader.readAsDataURL(file);
-  }, []);
-
-  // 超链接处理函数
-  const handleHyperlinkInsert = useCallback((data: Record<string, string>) => {
-    editorRef.current?.command.executeHyperlink({
-      type: ElementType.HYPERLINK,
-      value: data.text,
-      url: data.url
-    });
-  }, []);
-
-  // 代码块处理函数
-  const handleCodeBlockInsert = useCallback((data: Record<string, string>) => {
-    // 这里需要实现代码高亮逻辑
-    editorRef.current?.command.executeInsertElementList([{ type: ElementType.CONTROL, value: data.code }]);
-  }, []);
-
-  // 日期格式处理函数
-  const handleDateFormatSelect = useCallback((format: string) => {
-    const date = new Date().toISOString();
-    editorRef.current?.command.executeInsertElementList([
-      {
-        type: ElementType.DATE,
-        dateFormat: format,
-        value: date
-      }
-    ]);
-  }, []);
-
-  // 添加搜索相关处理函数
-  const handleSearch = useCallback((keyword: string) => {
-    editorRef.current?.command.executeSearch(keyword || null);
-    const result = editorRef.current?.command.getSearchNavigateInfo();
-    setSearchResult(result ? { index: result.index, count: result.count } : null);
-  }, []);
-
-  const handleReplace = useCallback(() => {
-    if (searchKeyword && replaceKeyword && searchKeyword !== replaceKeyword) {
-      editorRef.current?.command.executeReplace(replaceKeyword);
-    }
-  }, [searchKeyword, replaceKeyword]);
-
-  const handleSearchNavigate = useCallback((direction: "prev" | "next") => {
-    if (direction === "prev") {
-      editorRef.current?.command.executeSearchNavigatePre();
-    } else {
-      editorRef.current?.command.executeSearchNavigateNext();
-    }
-    const result = editorRef.current?.command.getSearchNavigateInfo();
-    setSearchResult(result ? { index: result.index, count: result.count } : null);
-  }, []);
-
-  // 添加打印处理函数
-  const handlePrint = useCallback(() => {
-    editorRef.current?.command.executePrint();
-  }, []);
-
-  const [editorOptions, setEditorOptions] = useState({});
-  const [catalogVisible, setCatalogVisible] = useState(true);
-  const [fullscreen, setFullscreen] = useState(false);
-  const [pageMode, setPageMode] = useState<PageMode>(PageMode.CONTINUITY);
-  const [paperDirection, setPaperDirection] = useState<PaperDirection>(PaperDirection.VERTICAL);
-
-  // 目录操作
-  const handleCatalogToggle = () => {
-    setCatalogVisible(!catalogVisible);
-    if (!catalogVisible) {
-      updateCatalog();
-    }
-  };
-
-  const [catalogData, setCatalogData] = useState<ICatalogItem[]>([]);
-
-  const updateCatalog = async () => {
-    const catalog = await editorRef.current?.command.getCatalog();
-    if (catalog) {
-      setCatalogData(catalog);
-    }
-  };
-
-  // 编辑器配置对话框
-  const handleEditorConfig = () => {
-    const options = editorRef.current?.command.getOptions();
-    setEditorOptions(options || {});
-  };
-
-  // 页面模式切换
-  const handlePageModeChange = (mode: PageMode) => {
-    setPageMode(mode);
-    editorRef.current?.command.executePageMode(mode);
-  };
-
-  // 全屏切换
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen();
-    } else {
-      document.exitFullscreen();
-    }
-    setFullscreen(!fullscreen);
-  };
-
-  // 纸张方向设置
-  const handlePaperDirection = (direction: PaperDirection) => {
-    setPaperDirection(direction);
-    editorRef.current?.command.executePaperDirection(direction);
-  };
-
-  // 编辑器模式切换
-  const [currentModeIndex, setCurrentModeIndex] = useState(0);
-  const MODE_LIST = [
-    { mode: EditorMode.EDIT, name: "编辑模式" },
-    { mode: EditorMode.CLEAN, name: "清洁模式" },
-    { mode: EditorMode.READONLY, name: "只读模式" },
-    { mode: EditorMode.FORM, name: "表单模式" },
-    { mode: EditorMode.PRINT, name: "打印模式" },
-    { mode: EditorMode.DESIGN, name: "设计模式" }
-  ];
-
-  const cycleEditorMode = () => {
-    setCurrentModeIndex((prev) => (prev + 1) % MODE_LIST.length);
-    const newMode = MODE_LIST[currentModeIndex].mode;
-    editorRef.current?.command.executeMode(newMode);
-    // 更新菜单栏权限视觉反馈
-    const isReadonly = newMode === EditorMode.READONLY;
-    const enableMenuList = ["search", "print"];
-    // 这里需要根据实际DOM选择器调整
-    document.querySelectorAll<HTMLDivElement>(".menu-item>div").forEach((dom) => {
-      const menu = dom.dataset.menu;
-      isReadonly && (!menu || !enableMenuList.includes(menu))
-        ? dom.classList.add("disable")
-        : dom.classList.remove("disable");
-    });
-  };
-
   // 添加工具栏项目
   const additionalTools: ToolItem[] = [
     {
@@ -512,15 +228,7 @@ const Site = () => {
     {
       icon: <CheckSquare />,
       label: "复选框",
-      action: () => {
-        editorRef.current?.command.executeInsertElementList([
-          {
-            type: ElementType.CHECKBOX,
-            checkbox: { value: false },
-            value: ""
-          }
-        ]);
-      }
+      action: handleInsertCheckbox
     },
     {
       icon: <Calendar />,
@@ -528,12 +236,12 @@ const Site = () => {
       action: <DateFormatMenu onSelectFormat={handleDateFormatSelect} />
     },
     {
-      icon: <Search />, // 替换为合适的图标
+      icon: <Search />,
       label: "搜索替换",
       action: () => setIsSearchPanelOpen(true)
     },
     {
-      icon: <Printer />, // 替换为合适的图标
+      icon: <Printer />,
       label: "打印",
       action: handlePrint
     }
@@ -753,17 +461,6 @@ const Site = () => {
           </div>
         </div>
       </div>
-
-      {/* 目录面板 */}
-      {catalogVisible && (
-        <div className="catalog-panel">
-          <div className="catalog-header">
-            <span>目录</span>
-            <X size={16} onClick={handleCatalogToggle} />
-          </div>
-          <div className="catalog-content">{/* 动态渲染目录内容 */}</div>
-        </div>
-      )}
     </div>
   );
 };
