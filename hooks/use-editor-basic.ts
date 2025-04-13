@@ -15,7 +15,7 @@ const MODE_LIST = [
 export const useEditorBasic = () => {
   const editorRef = useRef<Editor | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [pageMode, setPageMode] = useState<PageMode>(PageMode.CONTINUITY);
+  const [pageMode, setPageMode] = useState<PageMode>(PageMode.PAGING);
   const [paperDirection, setPaperDirection] = useState<PaperDirection>(PaperDirection.VERTICAL);
   const [currentModeIndex, setCurrentModeIndex] = useState(0);
   const [editorOptions, setEditorOptions] = useState({});

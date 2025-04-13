@@ -16,7 +16,6 @@ import {
   Search,
   Printer,
   Settings,
-  ChevronDown,
   Fullscreen,
   X
 } from "lucide-react";
@@ -35,6 +34,8 @@ import { useDebounceFn } from "ahooks";
 import HyperlinkDialog from "./components/hyperlink-dialog";
 import CodeBlockDialog from "./components/code-block-dialog";
 import DateFormatMenu from "./components/date-format-menu";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 
 import type { EditorCommand, MenuItem, ToolItem } from "@/type.ts";
 
@@ -248,8 +249,9 @@ const Site = () => {
   ];
 
   return (
-    <div className="container mx-auto w-full">
+    <div className="container mx-auto h-full w-full">
       {/* 工具栏 */}
+
       <div className="bg-background/60 sticky top-0 z-50 flex w-full items-center justify-center gap-4 pt-2 pb-4 backdrop-blur">
         {/* 撤销/重做 */}
         <Button size="icon" variant="ghost" title={`撤销(${isApple ? "⌘" : "Ctrl"}+Z)`} onClick={handleUndo}>
@@ -382,33 +384,44 @@ const Site = () => {
         <input type="file" ref={imageInputRef} accept="image/*" className="hidden" onChange={handleImageUpload} />
       </div>
 
-      {/* 编辑器容器 */}
-      <div ref={containerRef} className="canvas-editor flex items-center justify-center border shadow-2xs" />
-
       <div>
-        {/* 目录开关 */}
-        <Button onClick={handleCatalogToggle}>{catalogVisible ? "隐藏目录" : "显示目录"}</Button>
-
+        {/* 目录面板（固定在左侧） */}
         {catalogVisible && (
-          <div className="catalog-panel">
-            <div className="catalog-header">
-              <span>目录</span>
-              <X size={16} onClick={handleCatalogToggle} />
+          <div className="fixed flex w-64 flex-col">
+            <div className="flex items-center justify-between border-b p-2">
+              <span className="font-medium">目录</span>
+              <Button variant="ghost" size="icon" onClick={handleCatalogToggle}>
+                <X size={16} />
+              </Button>
             </div>
-            <div className="catalog-content">
+            <div className="flex-1 overflow-y-auto p-2">
               {catalogData.map((item) => (
-                <div key={item.id} onClick={() => editorRef.current?.command.executeLocationCatalog(item.id)}>
+                <div
+                  key={item.id}
+                  className="cursor-pointer rounded px-2 py-1 hover:bg-gray-100"
+                  onClick={() => editorRef.current?.command.executeLocationCatalog(item.id)}
+                >
                   {item.name}
                 </div>
               ))}
             </div>
           </div>
         )}
+        {/* 编辑器容器 */}
+        <div ref={containerRef} className="canvas-editor flex flex-1 items-center justify-center border shadow-2xs" />
+      </div>
+
+      {/* 设置栏 */}
+      <div className="bg-background/60 sticky bottom-0 z-50 flex w-full items-center justify-center gap-4 pt-2 pb-4 backdrop-blur">
+        {/* 目录开关 */}
+        <Button variant="ghost" onClick={handleCatalogToggle}>
+          {catalogVisible ? "隐藏目录" : "显示目录"}
+        </Button>
 
         {/* 编辑器配置 */}
         <Dialog>
           <DialogTrigger asChild>
-            <Button onClick={handleEditorConfig}>
+            <Button variant="ghost" onClick={handleEditorConfig}>
               <Settings size={16} />
             </Button>
           </DialogTrigger>
@@ -416,7 +429,8 @@ const Site = () => {
             <DialogHeader>
               <DialogTitle>编辑器配置</DialogTitle>
             </DialogHeader>
-            <Input
+            <Textarea
+              className="max-h-96 overflow-auto"
               value={JSON.stringify(editorOptions, null, 2)}
               onChange={(e) => setEditorOptions(JSON.parse(e.target.value))}
             />
@@ -425,41 +439,39 @@ const Site = () => {
         </Dialog>
 
         {/* 页面模式选择 */}
-        <div className="dropdown">
-          <Button>
-            {pageMode} <ChevronDown size={14} />
-          </Button>
-          <div className="dropdown-menu">
+        <Select value={pageMode} onValueChange={(value) => handlePageModeChange(value as PageMode)}>
+          <SelectTrigger className="w-[180px]">{pageMode}</SelectTrigger>
+          <SelectContent>
             {Object.values(PageMode).map((mode) => (
-              <div key={mode} onClick={() => handlePageModeChange(mode)}>
+              <SelectItem key={mode} value={mode}>
                 {mode}
-              </div>
+              </SelectItem>
             ))}
-          </div>
-        </div>
+          </SelectContent>
+        </Select>
 
         {/* 全屏按钮 */}
-        <Button onClick={toggleFullscreen}>
+        <Button variant="ghost" onClick={toggleFullscreen}>
           <Fullscreen size={16} />
           {fullscreen ? "退出全屏" : "全屏"}
         </Button>
 
         {/* 编辑器模式切换 */}
-        <Button onClick={cycleEditorMode}>{MODE_LIST[currentModeIndex].name}</Button>
+        <Button variant="ghost" onClick={cycleEditorMode}>
+          {MODE_LIST[currentModeIndex].name}
+        </Button>
 
         {/* 纸张方向 */}
-        <div className="dropdown">
-          <Button>
-            {paperDirection} <ChevronDown size={14} />
-          </Button>
-          <div className="dropdown-menu">
-            {Object.values(PaperDirection).map((direction) => (
-              <div key={direction} onClick={() => handlePaperDirection(direction)}>
-                {direction}
-              </div>
+        <Select value={paperDirection} onValueChange={(value) => handlePaperDirection(value as PaperDirection)}>
+          <SelectTrigger className="w-[180px]">{paperDirection}</SelectTrigger>
+          <SelectContent>
+            {Object.values(PaperDirection).map((mode) => (
+              <SelectItem key={mode} value={mode}>
+                {mode}
+              </SelectItem>
             ))}
-          </div>
-        </div>
+          </SelectContent>
+        </Select>
       </div>
     </div>
   );

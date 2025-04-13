@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import type { Editor, ICatalogItem } from "@hufe921/canvas-editor";
 
 export const useEditorCatalog = (editorRef: React.RefObject<Editor | null>) => {
-  const [catalogVisible, setCatalogVisible] = useState(true);
+  const [catalogVisible, setCatalogVisible] = useState(false);
   const [catalogData, setCatalogData] = useState<ICatalogItem[]>([]);
 
   // 更新目录
